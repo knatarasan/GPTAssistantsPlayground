@@ -46,10 +46,16 @@ def print_like_dislike(x: gr.LikeData):
 
 
 def ask_assistant(assistant_id, history, message):
+    # Validate assistant selection before proceeding
+    if not assistant_id or str(assistant_id).strip() == "" or str(assistant_id).lower().startswith("id:") or str(assistant_id) == "new":
+        history = history or []
+        history.append([None, "No assistant selected. Choose an assistant or click 'Add Assistant' after selecting 'Create New Assistant'."])
+        return history, gr.MultimodalTextbox(value=None, interactive=True)
+
     assistant = api.retrieve_assistant(assistant_id)
     if assistant is None:
-        history.append((None, "Assistant not found."))
-        return history, gr.MultimodalTextbox(value=None, interactive=False)
+        history.append([None, "Assistant not found. Select a valid assistant from the dropdown."])
+        return history, gr.MultimodalTextbox(value=None, interactive=True)
 
     if history is None:
         history = []
@@ -72,10 +78,10 @@ def ask_assistant(assistant_id, history, message):
             with open(file_path, "w") as file:
                 file.write(file_content)
                 attachments = None
-            history.append((f"file {file}, saved to working folder.", None))
+            history.append([f"file {file}, saved to working folder.", None])
 
     if message["text"] is not None:
-        history.append((message["text"], None))
+        history.append([message["text"], None])
         content = message["text"]
     if content or attachments:  # only create a message if there is content
         api.create_thread_message(
@@ -111,14 +117,10 @@ def get_file_path(file):
     return file_path
 
 
-def run(history, assistant_id, artifacts):
+def run(history, assistant_id):
     if current_thread is None:
-        history.append((None, "Please create a new thread first."))
-        yield (
-            history,
-            artifacts,
-            gr.update(visible=artifacts),
-        )
+        history.append([None, "Please create a new thread first."])
+        yield history
         return
 
     assistant = api.retrieve_assistant(assistant_id)
@@ -127,12 +129,8 @@ def run(history, assistant_id, artifacts):
 
     if assistant is None:
         msg = "Assistant not found."
-        history.append((None, msg))
-        yield (
-            history,
-            artifacts,
-            gr.update(visible=artifacts),
-        )
+        history.append([None, msg])
+        yield history
         return
 
     def stream_worker(assistant_id, thread_id, event_handler):
@@ -150,7 +148,13 @@ def run(history, assistant_id, artifacts):
         target=stream_worker, args=(assistant.id, thread_id, eh)
     )
     initial_thread.start()
-    history[-1][1] = ""
+    # Ensure history has a valid placeholder assistant message
+    if not history or not isinstance(history[-1], list) or len(history[-1]) != 2:
+        history.append([None, ""])  # start a new assistant message row
+    elif history[-1][1] is None:
+        history[-1][1] = ""
+    else:
+        history.append([None, ""])  # append a new assistant message row
     while initial_thread.is_alive() or not output_queue.empty():
         try:
             item_type, item_value = output_queue.get(timeout=0.1)
@@ -167,7 +171,7 @@ def run(history, assistant_id, artifacts):
     # for file in files:
     #     file_path = get_file_path(file)
     #     if os.path.exists(file_path):
-    #         history.append((None, (file_path,)))
+    #         history.append([None, [file_path]])
     #     yield history
 
     # Final flush of images
@@ -175,8 +179,8 @@ def run(history, assistant_id, artifacts):
         file = eh.images.pop()
         file_path = get_file_path(file)
         if os.path.exists(file_path):
-            history.append((None, file_path))
-            history.append((None, (file_path,)))
+            history.append([None, file_path])
+            history.append([None, [file_path]])
         yield history
 
     initial_thread.join()
@@ -340,7 +344,9 @@ def main_interface():
                     container=True,
                     lines=45,
                 )
-                demo.load(logger.read_logs, None, logs, every=1)
+                # demo.load(logger.read_logs, None, logs, every=1.0)
+                demo.load(logger.read_logs, None, logs)
+
     demo.queue()
     # demo.launch(share=True, inbrowser=True)
     demo.launch(

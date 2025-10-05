@@ -57,6 +57,9 @@ def assistants_panel(actions_manager):
         assistant_temperature_new,
         assistant_top_p_new,
     ):
+        # Ensure we always provide a valid name to avoid a None choice in dropdown
+        if not assistant_name_new or str(assistant_name_new).strip() == "":
+            assistant_name_new = "New Assistant"
         tools = [
             {"type": "file_search"}
             if tool == "File search"
@@ -135,6 +138,8 @@ def assistants_panel(actions_manager):
     )
 
     with gr.Column(visible=False) as new_assistant_form:
+        print("INSIDE VISIBLE=FALSE")
+        add_button = gr.Button("Add Assistant", interactive=True, visible=True, variant="primary")
         assistant_name_new = gr.Textbox(
             label="Enter a user-friendly name",
             placeholder="Enter Name",
@@ -185,10 +190,11 @@ def assistants_panel(actions_manager):
                 value=1,
                 interactive=True,
             )
-        add_button = gr.Button("Add Assistant", interactive=True, visible=True)
 
     with gr.Column(visible=True) as existing_assistant_form:
-        assistant_id = gr.Markdown("ID:")
+        # add_button = gr.Button("Add Assistant", interactive=True, visible=True, variant="primary")
+
+        assistant_id = gr.Markdown("ID4:")
         assistant_name = gr.Textbox(
             label="Enter a user-friendly name", placeholder="Enter Name"
         )
@@ -287,8 +293,18 @@ def assistants_panel(actions_manager):
         )
         time.sleep(2)  # wait for assistant to be created
         assistant_options = list_assistants()
+        # Find the display name corresponding to the newly created assistant ID
+        # `assistant_options` is a mapping of {name: id}
+        selected_name = None
+        for name, a_id in assistant_options.items():
+            if a_id == new_assistant_id:
+                selected_name = name
+                break
+        # Fallback to "Create New Assistant" if not found for any reason
+        if selected_name is None:
+            selected_name = "Create New Assistant"
         return (
-            gr.update(choices=list(assistant_options.keys()), value=new_assistant_id),
+            gr.update(choices=list(assistant_options.keys()), value=selected_name),
             gr.update(visible=False),
             gr.update(visible=True),
             gr.update(visible=False),

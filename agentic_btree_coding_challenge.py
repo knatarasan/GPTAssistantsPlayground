@@ -117,5 +117,7 @@ tree = py_trees.trees.BehaviourTree(root)
 while True:
     tree.tick()
     time.sleep(20)  # Simulate time between ticks
+    print(f"root.status {root.status} and py_trees.common.Status.SUCCESS {py_trees.common.Status.SUCCESS}")
+
     if root.status == py_trees.common.Status.SUCCESS:
         break
